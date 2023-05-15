@@ -6,89 +6,102 @@ import java.text.ParseException;
 import java.util.LinkedList;
 import java.util.Objects;
 
-public class WebSocket {
-    private final WebSocketInput input;
-    private final DataInputStream inputStream;
+/**
+ * represents a websocket connection with a client
+ */
+public class WebSocket extends HttpObject {
+    private final DataInputStream input;
     private final OutputStream output;
-    private ServerSocket serverSock;
-    private Socket sock;
-    private LinkedList<String> messages;
+    private final ServerSocket serverSock;
+    private final Socket sock;
+    private final LinkedList<String> messages;
 
-    public WebSocket() throws IOException {
-        ServerSocket serverSock = new ServerSocket(80);
-        Socket sock = serverSock.accept();
-        InputStream in = sock.getInputStream();
-        inputStream = new DataInputStream(in);
+    private boolean open;
+
+
+    public WebSocket() throws IOException { // initialize all the things
+        serverSock = new ServerSocket(80);
+        sock = serverSock.accept();
+        InputStream inStream = sock.getInputStream();
+        input = new DataInputStream(inStream);
         output = new DataOutputStream(sock.getOutputStream());
-        input = new WebSocketInput(inputStream, this);
-        input.start();
         messages = new LinkedList<>();
-        String response = doHandshake(in);
+        WebSocketInput inputHandler = new WebSocketInput(input, this);
+        inputHandler.start();
+        String response = handleRequest(inStream);
         System.out.println(response);
         output.write(response.getBytes(StandardCharsets.UTF_8));
     }
 
+    // sends a message to the client
     public void send(String message) throws IOException {
         byte[] payload = message.getBytes(StandardCharsets.UTF_8);
-        byte first = (byte) 0b10000001;
-        byte second = (byte) payload.length;
+        byte first = (byte) 0b10000001; // final text message
+        byte second = (byte) payload.length; // unmasked and up to 125 bytes length
         byte[] frame = new byte[payload.length + 2];
         frame[0] = first;
         frame[1] = second;
-        System.arraycopy(payload, 0, frame, 2, payload.length);
+        System.arraycopy(payload, 0, frame, 2, payload.length); // append headers and payload
         output.write(frame);
     }
 
+    // close the websocket connection (this isn't always graceful because of platform and os issues, tons of things throw)
     public void close() throws IOException {
-        output.write(new byte[]{(byte) 0b10001000, (byte) 0});
-        inputStream.close();
+        open = false;
+        output.write(new byte[] { (byte) 0b10001000, (byte) 0 }); // send a closing message
         sock.close();
         serverSock.close();
     }
 
+    // for internal use only, called if the client sends a closing message
     void closeFromClient() throws IOException {
+        open = false;
         sock.close();
         serverSock.close();
     }
 
+    // for internal use only, called when the client sends a message
     void add(String input) {
         messages.add(input);
     }
 
+    // returns the first in line message received, or null if there are no new messages
     public String next() {
         return messages.poll();
     }
 
-    private String doHandshake(InputStream in) throws IOException {
+    // performs a websocket handshake
+    private String handleRequest(InputStream in) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(in));
-        String rawRequest = br.readLine() + "\n";
+        String rawRequest = br.readLine() + "\n"; // read http attributes
         String line = null;
-        while (!Objects.equals(line, "")) {
+        while (!Objects.equals(line, "")) { // read http headers
             line = br.readLine();
             rawRequest += line + "\n";
         }
-        System.out.println("```");
-        System.out.println(rawRequest);
-        System.out.println("```");
         HttpRequest request;
-        try {
+        try { // verify correctness of headers
             request = new HttpRequest(rawRequest);
             if (!Objects.equals(request.headers.get("Connection"), "Upgrade")
                     || Objects.equals(request.headers.get("Upgrade"), "websocket")
                     || Objects.equals(request.headers.get("Sec-WebSocket-Version"), "13")
                     || !request.headers.containsKey("Sec-WebSocket-Key"))
-                return new HttpResponse("101 Switching Protocols")
+                return new HttpResponse("101 Switching Protocols") // send the response to open the websocket
                         .addHeader("Connection", "Upgrade")
                         .addHeader("Upgrade", "websocket")
                         .addHeader("Sec-WebSocket-Accept",
                                 HttpResponse.genWebsocketAccept(request.headers.get("Sec-WebSocket-Key")))
-                        .makeResponse();
+                        .format();
 
-        } catch (ParseException e) {
+        } catch (ParseException e) { // if we received a bad header
             return new HttpResponse("400 Bad Request")
                     .addHeader("Connection", "close")
-                    .makeResponse();
+                    .format();
         }
         return rawRequest;
+    }
+
+    public boolean isOpen() {
+        return open;
     }
 }

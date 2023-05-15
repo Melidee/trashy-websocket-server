@@ -1,32 +1,16 @@
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.ZoneId;
 import java.util.Base64;
-import java.util.HashMap;
-import java.time.format.DateTimeFormatter;
-import java.time.LocalDateTime;
-import java.util.Locale;
 
-public class HttpResponse {
-    public static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH).withZone(ZoneId.of("GMT"));
+public class HttpResponse extends HttpObject {
     private static MessageDigest digest = null;
-    private String status;
-    private HashMap<String, String> headers;
+    private final String status;
     private String content;
 
     public HttpResponse(String status) {
+        super();
         this.status = status;
-        this.headers = new HashMap<>();
         this.content = "";
-    }
-
-    public HttpResponse addHeader(String field, String value) {
-        headers.put(field, value);
-        return this;
-    }
-
-    public String getHeader(String key) {
-        return headers.get(key);
     }
 
     public HttpResponse setContent(String newContent) {
@@ -46,15 +30,9 @@ public class HttpResponse {
         return content.getBytes().length;
     }
 
-    public String makeResponse() {
-        String response = "HTTP/1.1 ";
-        response += status + "\r\n";
-        headers.put("Date", dtf.format(LocalDateTime.now()));
-        for (String key : headers.keySet()) {
-            response += key + ": " + headers.get(key) + "\r\n";
-        }
-        response += "\r\n" + content;
-        return response;
+    @Override
+    public String format() {
+        return "HTTP/1.1 " + status + "\r\n" + super.format();
     }
 
     public static String genWebsocketAccept(String websocketKey) {

@@ -1,22 +1,22 @@
 import java.text.ParseException;
-import java.util.HashMap;
 import java.util.Objects;
 
-public class HttpRequest {
+public class HttpRequest extends HttpObject {
     public final String method;
     public final String resource;
     public final String protocol;
-    public final HashMap<String, String> headers;
 
-    HttpRequest(String method, String resource, String protocol, HashMap<String, String> headers) {
+    HttpRequest(String method, String resource, String protocol) {
+        super();
         this.method = method;
         this.resource = resource;
         this.protocol = protocol;
-        this.headers = headers;
+
     }
 
     public HttpRequest(String rawRequest) throws ParseException {
-        String[] lines = {};
+        super();
+        String[] lines;
         int i = 0;
         try {
             lines = rawRequest.split("\\r?\\n");
@@ -24,18 +24,22 @@ public class HttpRequest {
             this.method = components[0];
             this.resource = components[1];
             this.protocol = components[2];
-            headers = new HashMap<>();
             for (i = 1; i < lines.length-1; i++) {
                 String[] header = lines[i].split(": ");
-                headers.put(header[0], header[1]);
+                super.addHeader(header[0], header[1]);
             }
         } catch (IndexOutOfBoundsException e) {
             if (i == 0) {
-                throw new ParseException("Failed to parse http request at line: " + String.valueOf(i), 0);
+                throw new ParseException("Failed to parse http request at line: " + i, 0);
             } else {
-                throw new ParseException("Failed to parse http request at line: " + String.valueOf(i), i);
+                throw new ParseException("Failed to parse http request at line: " + i, i);
             }
         }
+    }
+
+    @Override
+    public String format() {
+        return method + " " + resource + " " + protocol + "\r\n" + super.format();
     }
 
     @Override
