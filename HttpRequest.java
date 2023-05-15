@@ -11,24 +11,23 @@ public class HttpRequest extends HttpObject {
         this.method = method;
         this.resource = resource;
         this.protocol = protocol;
-
     }
 
-    public HttpRequest(String rawRequest) throws ParseException {
+    public HttpRequest(String rawRequest) throws ParseException { // this parses an http request from the user
         super();
         String[] lines;
         int i = 0;
         try {
             lines = rawRequest.split("\\r?\\n");
-            String[] components = lines[0].split(" ");
+            String[] components = lines[0].split(" "); // seperate parts of request signature
             this.method = components[0];
             this.resource = components[1];
             this.protocol = components[2];
-            for (i = 1; i < lines.length-1; i++) {
+            for (i = 1; i < lines.length-1; i++) { // parse through http headers
                 String[] header = lines[i].split(": ");
                 super.addHeader(header[0], header[1]);
             }
-        } catch (IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) { // if we are given an invalid request
             if (i == 0) {
                 throw new ParseException("Failed to parse http request at line: " + i, 0);
             } else {
