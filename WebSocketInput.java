@@ -82,7 +82,7 @@ class WebSocketInput extends Thread {
     }
 
     @Override
-    public void run() {
+    public void run() { // this code is run in the new thread
         inputLoop();
     }
 }
