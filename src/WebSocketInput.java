@@ -42,7 +42,11 @@ class WebSocketInput extends Thread {
             int opcode = first & 0b00001111;
             int length = second & 0b01111111;
             if (opcode == 0x8) { // if we received a close message we need to end the connection
-                ws.closeFromClient();
+                try { // we need to catch the case where the client tries to send a close message as the host is closing
+                    ws.closeFromClient();
+                } catch (NullPointerException e) {
+                    return;
+                }
                 return;
             }
             if (length == 126) { // if we have a 2 byte length prefix
@@ -75,10 +79,6 @@ class WebSocketInput extends Thread {
             payload[i] = (byte) (inputStream.readByte() ^ maskKey[i % 4]);
         }
         return payload;
-    }
-
-    void end() {
-
     }
 
     @Override
